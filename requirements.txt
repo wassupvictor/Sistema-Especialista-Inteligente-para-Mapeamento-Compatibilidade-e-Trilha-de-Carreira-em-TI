@@ -1,0 +1,2 @@
+experta==1.9.4
+streamlit>=1.28,<2
