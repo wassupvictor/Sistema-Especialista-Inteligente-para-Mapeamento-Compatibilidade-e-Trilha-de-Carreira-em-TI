@@ -1,8 +1,30 @@
 # 💻 Consultor Inteligente de Carreiras em TI
 
-> Sistema especialista acadêmico que compara afinidades e objetivos profissionais com dez trilhas de TI, explica o ranking e transforma lacunas de conhecimento em um plano de ação.
+> ### Descubra trilhas de TI compatíveis com seus interesses e planeje seus próximos passos.
 
-A aplicação usa um motor próprio de inferência ponderada, uma base de conhecimento JSON validada, Pandas para exportar tabelas e Streamlit para o assistente interativo. O resultado representa **aderência às respostas informadas**: não mede capacidade, não prevê desempenho e não garante resultado profissional.
+Sistema especialista acadêmico com **inferência ponderada**, **base de conhecimento JSON** e uma interface interativa feita com **Streamlit**.
+
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-aplica%C3%A7%C3%A3o-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Pandas](https://img.shields.io/badge/Pandas-an%C3%A1lise-150458?logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Plotly](https://img.shields.io/badge/Plotly-gr%C3%A1ficos-3F4F75?logo=plotly&logoColor=white)](https://plotly.com/)
+
+**Navegação:** [Trilhas](#-trilhas-avaliadas) · [Execução](#-como-executar) · [Pontuação](#-como-funciona-a-pontuação) · [Gaps e roadmap](#-análise-de-gaps-e-plano-de-ação) · [Testes](#-testes-e-casos-limite)
+
+---
+
+> **Importante:** a aderência mostra compatibilidade entre as respostas e os critérios modelados. **Não mede capacidade, não prevê desempenho e não garante resultado profissional.**
+
+## 📚 Navegação
+
+- [Trilhas avaliadas](#-trilhas-avaliadas)
+- [Como executar](#-como-executar)
+- [Arquitetura e base de conhecimento](#-arquitetura-e-base-de-conhecimento)
+- [Como funciona a pontuação](#-como-funciona-a-pontuação)
+- [Análise de gaps e plano de ação](#-análise-de-gaps-e-plano-de-ação)
+- [Testes e casos limite](#-testes-e-casos-limite)
+- [Rastreabilidade dos requisitos](#-rastreabilidade-dos-requisitos)
+- [Premissas e limitações](#-premissas-e-limitações)
 
 ## ✨ Trilhas avaliadas
 
@@ -19,15 +41,17 @@ A aplicação usa um motor próprio de inferência ponderada, uma base de conhec
 | 9 | **Engenharia de Qualidade e Testes (QA)** | Testes automatizados e confiabilidade de software |
 | 10 | **Gestão de Produtos (Product Management)** | Estratégia, priorização e conexão entre negócio e tecnologia |
 
-## ⚙️ Requisitos e execução
+## ⚙️ Como executar
 
-- Python 3.10 ou superior
-- Streamlit, Pandas e Plotly (versões declaradas em `requirements.txt`)
-- Git para versionamento; os projetos sugeridos incluem boas práticas de portfólio GitHub
+### Requisitos
 
-### Windows PowerShell
+- Python **3.10 ou superior**
+- Git
+- Dependências listadas em `requirements.txt` (Streamlit, Pandas e Plotly)
 
-Na pasta do projeto:
+### Windows — PowerShell
+
+Abra o PowerShell na pasta do projeto e execute:
 
 ```powershell
 py --version
@@ -36,7 +60,7 @@ py -m venv .venv
 .\.venv\Scripts\python.exe -m streamlit run main.py
 ```
 
-Abra `http://localhost:8501`. Para encerrar, use `Ctrl+C` no terminal.
+Abra [http://localhost:8501](http://localhost:8501) no navegador. Para encerrar, pressione `Ctrl+C` no terminal.
 
 ### macOS ou Linux
 
@@ -47,18 +71,18 @@ python3 -m venv .venv
 .venv/bin/python -m streamlit run main.py
 ```
 
-Abra `http://localhost:8501`. Para encerrar, use `Ctrl+C`.
+Abra [http://localhost:8501](http://localhost:8501) no navegador. Para encerrar, pressione `Ctrl+C` no terminal.
 
 ## 🧠 Arquitetura e base de conhecimento
 
 ```text
 .
-├── regras_carreiras.json      # Perguntas, dimensões, pesos, trilhas e plano de ação
-├── knowledge_base.py          # Leitura e validação das referências do JSON
-├── inference_engine.py        # Ranking ponderado, confiança e explicações
-├── gap_roadmap.py             # Lacunas, prontidão, roadmap e portfólio
-├── main.py                    # Wizard Streamlit
-├── demo_edge_cases.py         # Tabela de perfis ambíguos para demonstração
+├── regras_carreiras.json      # Perguntas, pesos, trilhas e plano de ação
+├── knowledge_base.py          # Carregamento e validação do JSON
+├── inference_engine.py        # Ranking ponderado e explicações
+├── gap_roadmap.py             # Gaps, prontidão, roadmap e portfólio
+├── main.py                    # Wizard e resultados Streamlit
+├── demo_edge_cases.py         # Demonstração dos perfis ambíguos
 ├── tests/
 │   ├── test_knowledge_base.py
 │   ├── test_inference_engine.py
@@ -69,28 +93,32 @@ Abra `http://localhost:8501`. Para encerrar, use `Ctrl+C`.
 └── README.md
 ```
 
-`regras_carreiras.json` é a fonte de conhecimento do sistema. O schema contém:
+`regras_carreiras.json` é a fonte de conhecimento do sistema. Nenhuma pergunta, trilha, peso, certificação ou projeto precisa ser codificado no Python.
 
-- `metadata`: versão, escala Likert e rótulos, escala de skills, limiar de empate, bônus declarado, prontidão Júnior, pesos de prioridade e ordem das fases/certificações.
-- `dimensions`: dimensões técnicas e comportamentais que alimentam o gráfico radar.
-- `profile_questions`: nível atual, horas disponíveis e nome opcional. Perfil pessoal e horas **não alteram o ranking**.
-- `questions`: 14 afinidades no Passo 2 e 6 objetivos no Passo 3, cada uma com dimensão, texto e ajuda. Todas usam Likert de 1 a 5; “Não sei” é válido.
-- `skills`: 32 conhecimentos autoavaliados de 0 (“Nunca usei”) a 3 (“Avançado”), organizados por categoria, com tópicos, tecnologias e estimativa de horas por nível.
-- `tracks`: exatamente dez trilhas, pesos de -3 a +3, perfil ideal, penalidades declarativas, requisitos para Júnior, sugestões de próximo nível, certificações e projetos.
-- `certifications` e `projects`: catálogo com metadados; cada referência é verificada antes do uso.
-- `demo_edge_cases`: perfis demonstrativos usados pelo script e pelos testes de ambiguidade.
+| Seção JSON | Conteúdo |
+|---|---|
+| `metadata` | Versão, escalas e rótulos, bônus, limiares, prioridades e ordem das fases/certificações |
+| `dimensions` | Dimensões que alimentam o gráfico radar |
+| `profile_questions` | Nível atual, horas disponíveis e nome opcional |
+| `questions` | 14 afinidades no Passo 2 e 6 objetivos no Passo 3 |
+| `skills` | 32 conhecimentos por categoria, com tópicos, tecnologias e estimativa de horas |
+| `tracks` | Dez trilhas, pesos, penalidades, perfil ideal e plano para o nível Júnior |
+| `certifications` e `projects` | Catálogos referenciados pelas trilhas |
+| `demo_edge_cases` | Perfis ambíguos usados na demonstração e nos testes |
 
-O carregador `load_knowledge_base(path=None)` permite carregar um arquivo alternativo e verifica IDs únicos, campos, faixas, perguntas e skills referenciadas, penalidades, trilhas, certificações e projetos. Erros de leitura, JSON ou referências inválidas geram mensagens claras em português. Os casos de demonstração são dados extras no JSON, não regras no código.
+As afinidades usam escala Likert de **1 a 5**; “Não sei” é uma resposta válida. As skills são autoavaliadas de **0** (“Nunca usei”) a **3** (“Avançado”). Perfil pessoal e horas disponíveis dão contexto ao plano, mas não alteram a pontuação das trilhas.
 
-## 📊 Pontuação, incerteza e desempates
+`knowledge_base.load_knowledge_base(path=None)` carrega o arquivo padrão ou um caminho alternativo. O carregador valida IDs, faixas, referências entre perguntas, skills, trilhas, certificações e projetos. Erros de leitura, JSON inválido ou referências inconsistentes geram mensagens em português.
 
-Para cada resposta Likert conhecida, a afinidade é normalizada:
+## 📊 Como funciona a pontuação
+
+Cada resposta conhecida é normalizada para uma afinidade entre 0 e 1:
 
 ```text
-a = (resposta - 1) / 4
+a = (resposta − 1) / 4
 ```
 
-O motor calcula, para cada trilha:
+O motor calcula a pontuação e a aderência de cada trilha:
 
 ```text
 score = Σ(a × peso positivo)
@@ -101,90 +129,118 @@ score = Σ(a × peso positivo)
 aderência (%) = clamp(score / soma dos pesos positivos respondidos, 0, 1) × 100
 ```
 
-O bônus da trilha declarada é 5% da soma dos pesos positivos respondidos naquela trilha. A porcentagem é limitada ao intervalo de 0 a 100 e arredondada a uma casa. Por exemplo, com pesos positivos 3 e 2, respostas 5 e 4 geram `3×1 + 2×0,75 = 4,5`; uma resposta 5 com peso -1 subtrai 1 e uma penalidade acionada subtrai 1 ponto. Sem bônus, `score = 2,5`, o denominador é 5 e a aderência é **50%**.
+<details>
+<summary><strong>Exemplo numérico</strong></summary>
 
-“Não sei” remove aquela resposta do numerador **e** do denominador da trilha. Se nenhuma pergunta positiva for respondida, a aderência é 0%. A cobertura é a fração dos pesos positivos do catálogo que recebeu resposta. A confiança combina cobertura e a margem entre as duas primeiras posições:
+Com pesos positivos **3** e **2**, respostas **5** e **4** geram:
 
 ```text
-confiança = cobertura × (0,25 + 0,75 × min(margem_em_pontos_percentuais / 20, 1))
+3 × 1 + 2 × 0,75 = 4,5 pontos
 ```
 
-Os níveis exibidos são Baixa (< 0,40), Média (de 0,40 até menos de 0,70) e Alta (≥ 0,70). O ranking completo usa aderência decrescente, quantidade de sinais fortes (afinidade ≥ 0,75 em peso ≥ 2) e, por fim, a ordem das trilhas no JSON. O Top 3 é uma fatia desse ranking ordenado.
+Uma resposta **5** com peso **−1** subtrai 1 ponto; uma penalidade acionada subtrai mais 1. Sem bônus, o score fica em **2,5**, o denominador é **5** e a aderência é **50%**.
 
-Penalidades são condições estruturadas (`<`, `<=`, `==`, `>=`, `>`), avaliadas sem `eval` ou `exec`. Quando duas posições adjacentes do Top 3 diferem por menos de `tie_threshold_pp` (5 pontos percentuais), o resultado marca empate parcial e compara respostas comuns e perguntas com pesos mais divergentes. A justificativa mostra contribuições positivas, conflitos, penalidades e eventual trilha declarada; as explicações usam textos da base JSON.
+</details>
 
-## 🧭 Skill gaps e plano de ação
+### Incerteza, confiança e empates
 
-O resultado permite escolher qualquer trilha do Top 3 para analisar o nível-alvo **Júnior**. O nível de experiência declarado dá contexto, mas a prontidão é calculada a partir das skills autoavaliadas:
+- **“Não sei”** remove a resposta do numerador e do denominador da trilha. Sem respostas positivas conhecidas, a aderência é 0%.
+- A **cobertura** é a fração dos pesos positivos do catálogo que recebeu resposta.
+- A confiança combina cobertura e a margem entre as duas primeiras posições:
+
+  ```text
+  confiança = cobertura × (0,25 + 0,75 × min(margem em pontos percentuais / 20, 1))
+  ```
+
+- Os níveis são **Baixa** (`< 0,40`), **Média** (`0,40` a `< 0,70`) e **Alta** (`≥ 0,70`).
+- O ranking é ordenado por aderência, quantidade de sinais fortes (afinidade `≥ 0,75` em peso `≥ 2`) e, por fim, pela ordem das trilhas no JSON.
+- Diferenças menores que `tie_threshold_pp` entre posições adjacentes do Top 3 são marcadas como **empate parcial**. A explicação compara respostas comuns e perguntas com pesos diferentes.
+- Pesos negativos representam conflitos de preferência. Penalidades usam condições estruturadas (`<`, `<=`, `==`, `>=`, `>`), sem `eval` ou `exec`.
+- As justificativas apresentam sinais positivos, conflitos, penalidades e eventual trilha desejada, com textos mantidos na base JSON.
+
+O bônus da trilha declarada é **5%** da soma dos pesos positivos respondidos naquela trilha. A porcentagem final é limitada ao intervalo de 0 a 100 e arredondada a uma casa decimal.
+
+## 🧭 Análise de gaps e plano de ação
+
+É possível selecionar qualquer trilha do Top 3 para comparar as skills informadas com o nível-alvo **Júnior**:
 
 ```text
 gap_skill = max(0, nível_exigido − nível_atual)
-prontidão = Σ(min(nível_atual, nível_exigido) × peso_prioridade)
-            / Σ(nível_exigido × peso_prioridade)
+
+prontidão =
+  Σ(min(nível_atual, nível_exigido) × peso da prioridade)
+  / Σ(nível_exigido × peso da prioridade)
 ```
 
-Os pesos de prioridade (essential/important/desirable) e níveis exigidos são configurados no JSON. O status por skill é atende, parcial ou lacuna. A partir do limiar de prontidão, a aplicação informa que o nível-alvo já é atendido e mostra sugestões para o próximo nível.
+Os pesos de prioridade (`essential`, `important`, `desirable`) e os níveis exigidos são configuráveis no JSON. O status de cada skill é **atende**, **parcial** ou **lacuna**. Atingido o limiar de prontidão, a aplicação informa que o nível-alvo já é atendido e mostra sugestões para o próximo nível.
 
-O roadmap separa lacunas em três fases, ordena por prioridade, tamanho do gap e ordem dos requisitos no JSON, e estima horas a partir de `est_hours_per_level`. O prazo é arredondado para cima conforme as horas semanais informadas. Certificações são filtradas pela prontidão mínima e apresentadas na ordem configurada (Entrada → Associada → Profissional). O portfólio seleciona projetos da trilha que cobrem mais lacunas, do mais simples ao mais complexo, com stack e entregáveis.
+O roadmap organiza as lacunas em três fases:
 
-**Confirme nomes, códigos, níveis e requisitos atuais das certificações nos sites oficiais** antes de incluí-las no plano de estudos. O sistema é educacional e suas estimativas de horas são aproximações, não recomendações oficiais de certificadoras.
+1. **Fundamentos essenciais**
+2. **Consolidação**
+3. **Diferenciais + certificação**
+
+As horas são estimadas com `est_hours_per_level`; o prazo é arredondado para cima com base nas horas semanais disponíveis. As certificações são filtradas pela prontidão mínima e ordenadas em **Entrada → Associada → Profissional**. Os projetos de portfólio são escolhidos conforme as lacunas que exercitam, do mais simples ao mais complexo.
+
+> **Certificações:** confirme nomes, códigos, níveis e requisitos atuais nos sites oficiais dos emissores. As estimativas de horas são aproximações educacionais, não recomendações oficiais.
 
 ## 🧪 Testes e casos limite
 
-No PowerShell:
+### Windows — PowerShell
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 .\.venv\Scripts\python.exe demo_edge_cases.py
 ```
 
-No macOS ou Linux:
+### macOS ou Linux
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python demo_edge_cases.py
 ```
 
-A suíte cobre personas derivadas dos pesos do JSON para as dez trilhas, carregamento e validação da base, ranking e Pandas, bônus, gaps, certificações, perfis neutro/baixo/alto/desconhecido, penalidades, ambiguidade, alteração dinâmica de peso e navegação AppTest do wizard.
+A suíte cobre personas derivadas dos pesos JSON para as dez trilhas, validação da base, ranking e Pandas, bônus, gaps, certificações, perfis neutro/baixo/alto/desconhecido, penalidades, ambiguidade, alteração dinâmica de peso e navegação do wizard com AppTest.
 
-Saída resumida dos casos ambíguos:
+### Resultados dos perfis ambíguos
 
-| Perfil | Ranking Top 3 | Empate parcial |
-|---|---|---|
-| Dados e desenvolvimento web | Front-end/UX — 92,3%; Ciência de Dados — 87,5%; Back-end — 81,8% | Sim |
-| Engenharia de Dados e Back-end | Engenharia de Dados — 83,3%; Back-end — 81,8%; QA — 72,5% | Sim |
-| DevOps e nuvem | DevOps/SRE — 96,4%; Cloud Architecture — 95,8%; Cibersegurança — 90,9% | Sim |
+| Perfil | 1º lugar | 2º lugar | 3º lugar | Empate |
+|---|---|---|---|:---:|
+| Dados e desenvolvimento web | Front-end/UX — **92,3%** | Ciência de Dados — **87,5%** | Back-end — **81,8%** | Sim |
+| Engenharia de Dados e Back-end | Engenharia de Dados — **83,3%** | Back-end — **81,8%** | QA — **72,5%** | Sim |
+| DevOps e nuvem | DevOps/SRE — **96,4%** | Cloud Architecture — **95,8%** | Cibersegurança — **90,9%** | Sim |
 
 ## ✅ Rastreabilidade dos requisitos
 
-| Requisito | Implementação |
-|---|---|
-| R1 — Python, Pandas, JSON, Streamlit e Git | `requirements.txt`, `regras_carreiras.json`, histórico Git |
-| R2 — Conhecimento desacoplado do código | `regras_carreiras.json`; `knowledge_base.load_knowledge_base` |
-| R3 — Inferência ponderada e penalidades | `inference_engine.recommend_tracks` |
-| R4 — Likert e entrada gradual | `metadata.likert`, `questions` e `_render_likert_step` |
-| R5 — Ranking Top 3 percentual | `InferenceResult.ranking`, `InferenceResult.top_three` |
-| R6 — Skill Gap Analysis | `gap_roadmap.build_gap_roadmap` |
-| R7 — Roadmap, certificações e projetos | `gap_roadmap.build_gap_roadmap` e catálogo JSON |
-| R8 — Wizard, gráficos, abas e plano | `main.py` |
-| R9 — Dez trilhas solicitadas | `tracks` em `regras_carreiras.json` |
-| R10 — Ambiguidade e casos limite | `demo_edge_cases` e `tests/test_edge_cases.py` |
-| R11 — Nível atual e alvo Júnior | `profile_questions`, `metadata.target_seniority` e gap |
-| R12 — Fases e documentação | cinco commits por fase e este README |
+| Req. | Implementação |
+|:---:|---|
+| R1 | `requirements.txt`, `regras_carreiras.json` e histórico Git |
+| R2 | `knowledge_base.load_knowledge_base`; conhecimento em JSON |
+| R3 | `inference_engine.recommend_tracks` |
+| R4 | `metadata.likert`, `questions` e wizard em `main.py` |
+| R5 | `InferenceResult.ranking`, `InferenceResult.top_three` e `to_dataframe()` |
+| R6 | `gap_roadmap.build_gap_roadmap` |
+| R7 | `gap_roadmap.build_gap_roadmap` e catálogos JSON |
+| R8 | Wizard, gráficos, abas e download Markdown em `main.py` |
+| R9 | As dez entradas da seção `tracks` |
+| R10 | `demo_edge_cases` e `tests/test_edge_cases.py` |
+| R11 | `profile_questions`, `metadata.target_seniority` e cálculo dos gaps |
+| R12 | Este README e os commits por fase |
 
 ## 📝 Premissas e limitações
 
-- Perguntas sem opinião podem ser marcadas como “Não sei”; elas não são inferidas nem preenchidas automaticamente.
-- Uma skill não informada equivale a nível 0 (“Nunca usei”) para o cálculo de gaps. Os níveis informados prevalecem sobre a categoria de experiência geral.
-- Dimensões ausentes de `ideal_profile` usam referência neutra 0,5 no radar.
+- Respostas “Não sei” não são inferidas nem contabilizadas no numerador ou denominador.
+- Skill não informada equivale ao nível 0 (“Nunca usei”) no cálculo de gaps.
+- A autoavaliação de skills determina a prontidão; o nível geral declarado fornece contexto.
+- Dimensões não definidas em `ideal_profile` usam referência neutra **0,5** no gráfico radar.
 - Horas de aprendizagem são estimativas lineares por nível; semanas são arredondadas para cima e não incluem pausas ou revisão.
-- A declaração de trilha desejada aplica um bônus limitado de alinhamento, visível na explicação; perfil, nome e horas não influenciam o score.
-- Empates são apresentados em vez de ocultados. A ordem do JSON é somente o último critério de desempate.
-- Certificações, custos, disponibilidade regional, pré-requisitos e nomes comerciais mudam. Confirme dados vigentes com os emissores oficiais.
-- A seleção de trilhas é orientação acadêmica e não substitui aconselhamento profissional nem validação com pessoas que atuam nas áreas.
+- Nome, horas e experiência geral não influenciam o score; a trilha desejada aplica o bônus informado.
+- Empates são apresentados. A ordem do JSON é somente o último critério de desempate.
+- Certificações, custos, disponibilidade regional, pré-requisitos e nomes comerciais podem mudar. Confirme dados vigentes com os emissores.
+- As recomendações são orientação acadêmica e não substituem aconselhamento profissional.
 
 ---
 
-🎓 **Projeto acadêmico** — Consultor Inteligente de Carreiras em TI.
-#   S i s t e m a - E s p e c i a l i s t a - I n t e l i g e n t e - p a r a - M a p e a m e n t o - C o m p a t i b i l i d a d e - e - T r i l h a - d e - C a r r e i r a - e m - T I  
- 
+---
+
+🎓 **Projeto acadêmico — Ciência da Computação, UNIPAC Barbacena**
