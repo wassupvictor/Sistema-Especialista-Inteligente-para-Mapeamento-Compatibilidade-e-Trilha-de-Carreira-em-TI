@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from gap_roadmap import build_gap_roadmap
-from inference_engine import UNKNOWN_ANSWER, recommend_tracks
+from inference_engine import recommend_tracks
 from knowledge_base import load_knowledge_base
 
 
@@ -20,6 +20,7 @@ knowledge = load_knowledge_base()
 metadata = knowledge["metadata"]
 likert = metadata["likert"]
 likert_labels = likert["labels"]
+skill_scale = metadata["skill_level"]
 profile_questions = knowledge["profile_questions"]
 questions_by_step = {
     step: [question for question in knowledge["questions"] if question["step"] == step]
@@ -49,14 +50,6 @@ def _advance(target_step: int) -> None:
     st.rerun()
 
 
-def _show_navigation(back_step: int | None, next_label: str, next_step: int) -> None:
-    left, right = st.columns(2)
-    if back_step is not None and left.button("Voltar", use_container_width=True):
-        _advance(back_step)
-    if right.button(next_label, type="primary", use_container_width=True):
-        _advance(next_step)
-
-
 def _render_profile_step() -> None:
     st.header("Passo 1 — Perfil pessoal")
     values = {}
@@ -84,7 +77,7 @@ def _render_profile_step() -> None:
             values[field["id"]] = st.text_input(field["text"], key=key)
         else:
             st.error(f"Tipo de campo de perfil não reconhecido: {field['type']}.")
-    if st.button("Próximo", type="primary", use_container_width=True):
+    if st.button("Próximo", type="primary", width="stretch"):
         time_fields = [item for item in profile_questions if item.get("role") == "time_budget"]
         valid = all(
             isinstance(values[field["id"]], int)
@@ -101,21 +94,27 @@ def _render_profile_step() -> None:
 def _render_likert_step(current_step: int) -> None:
     if current_step == 2:
         st.header("Passo 2 — Afinidades técnicas e conhecimentos")
-        st.caption("As respostas de afinidade usam escala de 1 a 5; “Não sei” é uma resposta válida.")
+        st.caption(
+            f"As respostas de afinidade usam escala de 1 a 5; "
+            f"“{likert['unknown_label']}” é uma resposta válida."
+        )
     else:
         st.header("Passo 3 — Objetivos de carreira")
-        st.caption("Indique suas preferências e trade-offs; você também pode declarar uma trilha desejada.")
+        st.caption("Indique suas preferências e compensações; você também pode declarar uma trilha desejada.")
 
     for question in questions_by_step[current_step]:
         state_key = f"answer_{question['id']}"
-        default = st.session_state.answers.get(question["id"], UNKNOWN_ANSWER)
+        default = st.session_state.answers.get(question["id"], likert["unknown_label"])
         st.session_state.setdefault(state_key, default)
         st.radio(
             question["text"],
-            [UNKNOWN_ANSWER, *(str(value) for value in range(likert["min"], likert["max"] + 1))],
+            [
+                likert["unknown_label"],
+                *(str(value) for value in range(likert["min"], likert["max"] + 1)),
+            ],
             format_func=lambda value: (
                 value
-                if value == UNKNOWN_ANSWER
+                if value == likert["unknown_label"]
                 else f"{value} — {likert_labels.get(value, '')}".strip()
             ),
             horizontal=True,
@@ -125,12 +124,6 @@ def _render_likert_step(current_step: int) -> None:
 
     if current_step == 2:
         st.subheader("Autoavaliação de conhecimentos")
-        skill_levels = {
-            0: "Nunca usei",
-            1: "Básico",
-            2: "Intermediário",
-            3: "Avançado",
-        }
         grouped_skills: dict[str, list[dict]] = defaultdict(list)
         for skill in knowledge["skills"]:
             grouped_skills[skill["category"]].append(skill)
@@ -138,12 +131,14 @@ def _render_likert_step(current_step: int) -> None:
             with st.expander(category):
                 for skill in skills:
                     state_key = f"skill_{skill['id']}"
-                    default = st.session_state.skill_levels.get(skill["id"], 0)
+                    default = st.session_state.skill_levels.get(
+                        skill["id"], skill_scale["min"]
+                    )
                     st.session_state.setdefault(state_key, default)
                     st.radio(
                         skill["name"],
-                        options=range(4),
-                        format_func=lambda value: f"{value} — {skill_levels[value]}",
+                        options=range(skill_scale["min"], skill_scale["max"] + 1),
+                        format_func=lambda value: f"{value} — {skill_scale['labels'][str(value)]}",
                         horizontal=True,
                         key=state_key,
                     )
@@ -161,14 +156,14 @@ def _render_likert_step(current_step: int) -> None:
         )
 
     left, right = st.columns(2)
-    if left.button("Voltar", use_container_width=True):
+    if left.button("Voltar", width="stretch"):
         _advance(current_step - 1)
     next_label = "Próximo" if current_step == 2 else "Ver resultado"
-    if right.button(next_label, type="primary", use_container_width=True):
+    if right.button(next_label, type="primary", width="stretch"):
         current_answers = {
             question["id"]: (
-                UNKNOWN_ANSWER
-                if st.session_state[f"answer_{question['id']}"] == UNKNOWN_ANSWER
+                likert["unknown_label"]
+                if st.session_state[f"answer_{question['id']}"] == likert["unknown_label"]
                 else int(st.session_state[f"answer_{question['id']}"])
             )
             for question in questions_by_step[current_step]
@@ -180,14 +175,22 @@ def _render_likert_step(current_step: int) -> None:
                 {
                     skill["id"]: st.session_state.get(
                         f"skill_{skill['id']}",
-                        st.session_state.skill_levels.get(skill["id"], 0),
+                        st.session_state.skill_levels.get(skill["id"], skill_scale["min"]),
                     )
                     for skill in knowledge["skills"]
                 }
             )
             _advance(3)
         else:
-            if any(answer not in [UNKNOWN_ANSWER, *range(1, 6)] for answer in st.session_state.answers.values()):
+            if any(
+                answer != likert["unknown_label"]
+                and (
+                    not isinstance(answer, int)
+                    or isinstance(answer, bool)
+                    or not likert["min"] <= answer <= likert["max"]
+                )
+                for answer in st.session_state.answers.values()
+            ):
                 st.error("Revise as respostas antes de continuar.")
             else:
                 profile_values = st.session_state.profile_values
@@ -197,7 +200,9 @@ def _render_likert_step(current_step: int) -> None:
                     if field["id"] in profile_values and field.get("role")
                 }
                 skills = {
-                    skill["id"]: st.session_state.skill_levels.get(skill["id"], 0)
+                    skill["id"]: st.session_state.skill_levels.get(
+                        skill["id"], skill_scale["min"]
+                    )
                     for skill in knowledge["skills"]
                 }
                 st.session_state.selected_goal = st.session_state.get("declared_goal")
@@ -219,7 +224,7 @@ def _render_likert_step(current_step: int) -> None:
 def _render_radar(track_id: str, answers: dict) -> None:
     track = tracks_by_id[track_id]
     questions_by_dimension = {
-        question["dimension"]: question
+        question["dimension"]: question["id"]
         for question in knowledge["questions"]
         if question["dimension"] is not None
     }
@@ -227,8 +232,10 @@ def _render_radar(track_id: str, answers: dict) -> None:
     user_values = []
     ideal_values = []
     for dimension in dimensions:
-        question = questions_by_dimension.get(dimension["id"])
-        response = answers.get(question["id"]) if question is not None else UNKNOWN_ANSWER
+        question_id = questions_by_dimension.get(dimension["id"])
+        response = likert["unknown_label"]
+        if question_id is not None:
+            response = answers.get(question_id, likert["unknown_label"])
         user_values.append(
             None
             if not isinstance(response, int) or isinstance(response, bool)
@@ -258,7 +265,7 @@ def _render_radar(track_id: str, answers: dict) -> None:
         showlegend=True,
         margin={"l": 35, "r": 35, "t": 35, "b": 35},
     )
-    st.plotly_chart(figure, use_container_width=True)
+    st.plotly_chart(figure, width="stretch")
 
 
 def _render_results() -> None:
@@ -306,6 +313,16 @@ def _render_results() -> None:
             "As justificativas descrevem compatibilidade entre respostas e critérios da base; "
             "não representam capacidade profissional."
         )
+        if result.declared_goal_id:
+            declared_result = next(
+                item for item in result.ranking if item.track_id == result.declared_goal_id
+            )
+            bonus = metadata["declared_goal_bonus"] * 100
+            st.info(
+                f"Você declarou **{declared_result.name}** como objetivo. "
+                f"Foi aplicado bônus de alinhamento de {bonus:.0f}% aos pesos respondidos; "
+                f"a aderência dessa trilha é {declared_result.adherence_pct:.1f}%."
+            )
         for item in result.top_three:
             st.subheader(item.name)
             st.write(item.description)
@@ -321,12 +338,6 @@ def _render_results() -> None:
                 st.markdown("**Conflitos identificados:**")
                 for explanation in item.penalties:
                     st.markdown(f"- {explanation}")
-            if result.declared_goal_id == item.track_id:
-                bonus = metadata["declared_goal_bonus"] * 100
-                st.info(
-                    f"Trilha desejada declarada por você: bônus de alinhamento de "
-                    f"{bonus:.0f}% aplicado aos pesos respondidos."
-                )
 
     top_ids = [item.track_id for item in result.top_three]
     selected_track_id = st.selectbox(
@@ -343,7 +354,9 @@ def _render_results() -> None:
         knowledge_base=knowledge,
     )
     with tabs[2]:
-        st.subheader(f"Lacunas para {gap_plan.track_name} — alvo Júnior")
+        st.subheader(
+            f"Lacunas para {gap_plan.track_name} — alvo {gap_plan.target_level}"
+        )
         readiness_col, level_col = st.columns(2)
         readiness_col.metric("Prontidão estimada", f"{gap_plan.readiness:.1f}%")
         level_col.metric("Nível-alvo", gap_plan.target_level)
@@ -351,7 +364,7 @@ def _render_results() -> None:
             st.success("Com base nas skills informadas, você já atende ao nível Júnior estimado.")
             for hint in gap_plan.next_level_hints:
                 st.markdown(f"- {hint}")
-        st.dataframe(gap_plan.skills_dataframe(), use_container_width=True, hide_index=True)
+        st.dataframe(gap_plan.skills_dataframe(), width="stretch", hide_index=True)
 
     with tabs[3]:
         st.subheader("Plano personalizado")
@@ -386,7 +399,7 @@ def _render_results() -> None:
             for certification in gap_plan.certifications:
                 st.markdown(
                     f"- **{certification.name}** — {certification.issuer}; "
-                    f"nível {certification.tier}; momento indicado: {certification.timing}."
+                    f"nível {certification.tier_label}; momento indicado: {certification.timing}."
                 )
         else:
             st.info("Nenhuma certificação desta trilha atende à prontidão atual.")

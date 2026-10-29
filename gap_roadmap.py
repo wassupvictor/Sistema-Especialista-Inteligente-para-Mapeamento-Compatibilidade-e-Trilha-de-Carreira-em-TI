@@ -7,16 +7,6 @@ from typing import Any, Mapping
 from knowledge_base import load_knowledge_base
 
 
-_PRIORITY_WEIGHT = {"essential": 3, "important": 2, "desirable": 1}
-_PRIORITY_ORDER = {"essential": 0, "important": 1, "desirable": 2}
-_CERTIFICATION_ORDER = {"entry": 0, "associate": 1, "professional": 2}
-_PHASES = (
-    ("Fundamentos essenciais", "essential"),
-    ("Consolidação", "important"),
-    ("Diferenciais + certificação", "desirable"),
-)
-
-
 @dataclass(frozen=True)
 class SkillGap:
     skill_id: str
@@ -26,6 +16,7 @@ class SkillGap:
     required_level: int
     gap: int
     priority: str
+    priority_label: str
     status: str
     topics: tuple[str, ...]
     technologies: tuple[str, ...]
@@ -55,6 +46,7 @@ class CertificationSuggestion:
     name: str
     issuer: str
     tier: str
+    tier_label: str
     min_readiness: float
     timing: str
 
@@ -96,7 +88,7 @@ class GapRoadmap:
                     "nível atual": item.current_level,
                     "nível exigido": item.required_level,
                     "gap": item.gap,
-                    "prioridade": item.priority,
+                    "prioridade": item.priority_label,
                     "status": item.status,
                 }
                 for item in self.skills
@@ -104,7 +96,11 @@ class GapRoadmap:
         )
 
 
-def _validate_skill_levels(skill_levels: Mapping[str, Any], skills: list[dict[str, Any]]) -> dict[str, int]:
+def _validate_skill_levels(
+    skill_levels: Mapping[str, Any],
+    skills: list[dict[str, Any]],
+    scale: dict[str, Any],
+) -> dict[str, int]:
     if not isinstance(skill_levels, Mapping):
         raise ValueError("A autoavaliação de skills deve ser fornecida em um dicionário.")
     skill_ids = {skill["id"] for skill in skills}
@@ -113,8 +109,15 @@ def _validate_skill_levels(skill_levels: Mapping[str, Any], skills: list[dict[st
         raise ValueError(f"Skill inexistente: {', '.join(sorted(map(str, unknown)))}.")
     validated = {}
     for skill_id, level in skill_levels.items():
-        if isinstance(level, bool) or not isinstance(level, int) or not 0 <= level <= 3:
-            raise ValueError(f"Nível inválido para '{skill_id}': use um inteiro de 0 a 3.")
+        if (
+            isinstance(level, bool)
+            or not isinstance(level, int)
+            or not scale["min"] <= level <= scale["max"]
+        ):
+            raise ValueError(
+                f"Nível inválido para '{skill_id}': use um inteiro de "
+                f"{scale['min']} a {scale['max']}."
+            )
         validated[skill_id] = level
     return validated
 
@@ -122,6 +125,7 @@ def _validate_skill_levels(skill_levels: Mapping[str, Any], skills: list[dict[st
 def _make_markdown(
     track_name: str,
     current_level: str | None,
+    target_level: str,
     readiness: float,
     meets_junior: bool,
     phases: tuple[RoadmapPhase, ...],
@@ -133,12 +137,14 @@ def _make_markdown(
         f"# Plano de desenvolvimento: {track_name}",
         "",
         f"- Nível informado: {current_level or 'não informado'}",
-        "- Nível-alvo: Júnior",
+        f"- Nível-alvo: {target_level}",
         f"- Prontidão estimada: {readiness:.1f}%",
         "",
     ]
     if meets_junior:
-        lines.extend(["Você já atende ao nível Júnior estimado pela base de skills.", ""])
+        lines.extend(
+            [f"Você já atende ao nível {target_level} estimado pela base de skills.", ""]
+        )
         lines.extend(f"- Próximo nível: {hint}" for hint in hints)
         lines.append("")
     for phase in phases:
@@ -162,7 +168,7 @@ def _make_markdown(
     if certifications:
         for cert in certifications:
             lines.append(
-                f"- {cert.name} ({cert.issuer}; {cert.tier}): {cert.timing}."
+                f"- {cert.name} ({cert.issuer}; {cert.tier_label}): {cert.timing}."
             )
     else:
         lines.append("Nenhuma certificação desta trilha atende à prontidão atual.")
@@ -189,16 +195,43 @@ def build_gap_roadmap(
     current_level: str | None = None,
     knowledge_base: dict[str, Any] | None = None,
 ) -> GapRoadmap:
-    """Compara skills atuais com Júnior e monta fases, certificações e projetos."""
+    """Compara skills atuais com o nível-alvo e monta um plano de desenvolvimento."""
     data = knowledge_base if knowledge_base is not None else load_knowledge_base()
     tracks = {track["id"]: track for track in data["tracks"]}
     if track_id not in tracks:
         raise ValueError(f"Trilha inexistente: '{track_id}'.")
-    if isinstance(hours_per_week, bool) or not isinstance(hours_per_week, int) or hours_per_week < 1:
-        raise ValueError("Informe pelo menos uma hora disponível por semana.")
+    time_budget = next(
+        (field for field in data["profile_questions"] if field.get("role") == "time_budget"),
+        None,
+    )
+    if not isinstance(time_budget, dict):
+        raise ValueError("A base não define o campo de horas semanais.")
+    minimum_hours = time_budget["min"]
+    maximum_hours = time_budget["max"]
+    if (
+        isinstance(hours_per_week, bool)
+        or not isinstance(hours_per_week, int)
+        or not minimum_hours <= hours_per_week <= maximum_hours
+    ):
+        raise ValueError("Informe uma quantidade de horas semanais dentro dos limites da base.")
     track = tracks[track_id]
     skills_by_id = {skill["id"]: skill for skill in data["skills"]}
-    levels = _validate_skill_levels(skill_levels, data["skills"])
+    levels = _validate_skill_levels(
+        skill_levels,
+        data["skills"],
+        data["metadata"]["skill_level"],
+    )
+    priority_weights = data["metadata"]["priority_weights"]
+    priority_order = {
+        priority: order
+        for order, priority in enumerate(
+            sorted(priority_weights, key=priority_weights.get, reverse=True)
+        )
+    }
+    certification_tier_order = {
+        tier: order
+        for order, tier in enumerate(data["metadata"]["certification_tier_order"])
+    }
 
     gaps: list[tuple[int, SkillGap]] = []
     weighted_covered = 0.0
@@ -206,9 +239,11 @@ def build_gap_roadmap(
     for order, requirement in enumerate(track["junior_requirements"]):
         skill = skills_by_id[requirement["skill"]]
         required = requirement["level"]
-        current = levels.get(skill["id"], 0)
+        current = levels.get(
+            skill["id"], data["metadata"]["skill_level"]["min"]
+        )
         priority = requirement["priority"]
-        weight = _PRIORITY_WEIGHT[priority]
+        weight = priority_weights[priority]
         weighted_covered += min(current, required) * weight
         weighted_required += required * weight
         gap = max(0, required - current)
@@ -225,6 +260,7 @@ def build_gap_roadmap(
                     required_level=required,
                     gap=gap,
                     priority=priority,
+                    priority_label=data["metadata"]["priority_labels"][priority],
                     status=status,
                     topics=tuple(skill["learn"]["topics"]),
                     technologies=tuple(skill["learn"]["technologies"]),
@@ -232,20 +268,22 @@ def build_gap_roadmap(
                 ),
             )
         )
-    readiness = weighted_covered / weighted_required if weighted_required else 1.0
-    readiness = round(readiness * 100, 1)
-    meets_junior = readiness / 100 >= data["metadata"]["junior_ready_threshold"]
+    readiness_ratio = weighted_covered / weighted_required if weighted_required else 1.0
+    readiness = round(readiness_ratio * 100, 1)
+    meets_junior = readiness_ratio >= data["metadata"]["junior_ready_threshold"]
     ordered_gaps = sorted(
         gaps,
         key=lambda item: (
-            _PRIORITY_ORDER[item[1].priority],
+            priority_order[item[1].priority],
             -item[1].gap,
             item[0],
         ),
     )
 
     phases = []
-    for phase_title, priority in _PHASES:
+    for phase_definition in data["metadata"]["roadmap_phases"]:
+        phase_title = phase_definition["title"]
+        priority = phase_definition["priority"]
         phase_gaps = [item for _, item in ordered_gaps if item.priority == priority and item.gap]
         roadmap_items = tuple(
             RoadmapItem(
@@ -272,11 +310,11 @@ def build_gap_roadmap(
     eligible_certs = [
         (order, certifications_by_id[cert_id])
         for order, cert_id in enumerate(track["certifications"])
-        if certifications_by_id[cert_id]["min_readiness"] <= readiness / 100
+        if certifications_by_id[cert_id]["min_readiness"] <= readiness_ratio
     ]
     eligible_certs.sort(
         key=lambda pair: (
-            _CERTIFICATION_ORDER[pair[1]["tier"]],
+            certification_tier_order[pair[1]["tier"]],
             pair[1]["min_readiness"],
             pair[0],
         )
@@ -286,6 +324,7 @@ def build_gap_roadmap(
             name=cert["name"],
             issuer=cert["issuer"],
             tier=cert["tier"],
+            tier_label=data["metadata"]["certification_tier_labels"][cert["tier"]],
             min_readiness=cert["min_readiness"],
             timing=(
                 "após fechar lacunas essenciais"
@@ -326,9 +365,11 @@ def build_gap_roadmap(
     skill_results = tuple(item for _, item in gaps)
     phase_results = tuple(phases)
     hints = tuple(track["next_level_hints"]) if meets_junior else ()
+    target_level = data["metadata"]["target_seniority"]
     markdown = _make_markdown(
         track["name"],
         current_level,
+        target_level,
         readiness,
         meets_junior,
         phase_results,
@@ -340,7 +381,7 @@ def build_gap_roadmap(
         track_id=track_id,
         track_name=track["name"],
         current_level=current_level,
-        target_level="Júnior",
+        target_level=target_level,
         readiness=readiness,
         meets_junior=meets_junior,
         skills=skill_results,

@@ -1,9 +1,11 @@
 {
   "metadata": {
     "version": "2.0",
+    "target_seniority": "Júnior",
     "likert": {
       "min": 1,
       "max": 5,
+      "unknown_label": "Não sei",
       "labels": {
         "1": "Nada",
         "2": "Pouco",
@@ -12,6 +14,25 @@
         "5": "Muito"
       }
     },
+    "skill_level": {
+      "min": 0,
+      "max": 3,
+      "labels": {
+        "0": "Nunca usei",
+        "1": "Básico",
+        "2": "Intermediário",
+        "3": "Avançado"
+      }
+    },
+    "priority_weights": {"essential": 3, "important": 2, "desirable": 1},
+    "priority_labels": {"essential": "Essencial", "important": "Importante", "desirable": "Desejável"},
+    "roadmap_phases": [
+      {"priority": "essential", "title": "Fundamentos essenciais"},
+      {"priority": "important", "title": "Consolidação"},
+      {"priority": "desirable", "title": "Diferenciais + certificação"}
+    ],
+    "certification_tier_order": ["entry", "associate", "professional"],
+    "certification_tier_labels": {"entry": "Entrada", "associate": "Associada", "professional": "Profissional"},
     "tie_threshold_pp": 5,
     "declared_goal_bonus": 0.05,
     "junior_ready_threshold": 0.85
@@ -98,7 +119,7 @@
       "id": "backend",
       "name": "Desenvolvimento Back-end",
       "description": "Lógica de servidores, APIs, regras de negócio e bancos de dados.",
-      "weights": {"q_logic": 3, "q_build_apis": 3, "q_quality": 1, "q_communication": 1, "q_analysis": 1, "q_creative_over_analytic": -1},
+      "weights": {"q_logic": 3, "q_build_apis": 3, "q_quality": 2, "q_communication": 2, "q_analysis": 1, "q_creative_over_analytic": -1},
       "ideal_profile": {"logic": 0.9, "infra": 0.5, "quality": 0.7, "pipelines": 0.5},
       "penalties": [],
       "junior_requirements": [{"skill": "python", "level": 2, "priority": "essential"}, {"skill": "http_api", "level": 2, "priority": "essential"}, {"skill": "backend_framework", "level": 2, "priority": "essential"}, {"skill": "sql", "level": 1, "priority": "important"}, {"skill": "databases", "level": 2, "priority": "important"}, {"skill": "testing", "level": 1, "priority": "desirable"}],
@@ -194,7 +215,7 @@
       "id": "qa",
       "name": "Engenharia de Qualidade e Testes (QA)",
       "description": "Testes automatizados, confiabilidade de software e processos de qualidade.",
-      "weights": {"q_quality": 3, "q_logic": 2, "q_automation": 2, "q_build_apis": 1, "q_communication": 1, "q_creative_over_analytic": -1},
+      "weights": {"q_quality": 3, "q_logic": 2, "q_automation": 2, "q_build_apis": 2, "q_communication": 1, "q_creative_over_analytic": -1},
       "ideal_profile": {"quality": 1.0, "logic": 0.8, "automation": 0.8, "communication": 0.6},
       "penalties": [{"id": "qa_low_detail", "when": [{"question": "q_quality", "op": "<=", "value": 2}], "points": 1.5, "explanation": "Baixa afinidade com testes e atenção a detalhes conflita com as atividades centrais de QA."}],
       "junior_requirements": [{"skill": "testing", "level": 2, "priority": "essential"}, {"skill": "test_strategy", "level": 2, "priority": "essential"}, {"skill": "sql", "level": 1, "priority": "important"}, {"skill": "python", "level": 1, "priority": "important"}, {"skill": "cicd", "level": 1, "priority": "desirable"}, {"skill": "http_api", "level": 1, "priority": "desirable"}],
@@ -250,5 +271,32 @@
     {"id": "qa_api_checks", "title": "Validação automatizada de API", "description": "Verifique contratos, dados inválidos e regressões de uma API de demonstração.", "stack": ["Python", "pytest", "OpenAPI"], "deliverables": ["README com cenários", "CI no GitHub Actions", "testes automatizados", "relatório de defeitos"], "skills_exercised": ["test_strategy", "testing", "http_api", "sql"], "difficulty": 2},
     {"id": "product_discovery_project", "title": "Estudo de descoberta de produto", "description": "Investigue um problema, sintetize evidências e proponha hipótese mensurável.", "stack": ["Figma", "Planilhas", "Kanban"], "deliverables": ["README com pesquisa", "mapa de hipóteses", "protótipo", "métricas de sucesso"], "skills_exercised": ["product_discovery", "ux", "agile", "data_analysis"], "difficulty": 1},
     {"id": "product_roadmap", "title": "Roadmap orientado a resultados", "description": "Priorize oportunidades e apresente um plano de produto com métricas.", "stack": ["Kanban", "Figma", "Planilhas"], "deliverables": ["README com contexto", "roadmap priorizado", "registro de decisões", "plano de acompanhamento"], "skills_exercised": ["agile", "product_discovery", "communication", "data_analysis"], "difficulty": 2}
+  ],
+  "demo_edge_cases": [
+    {
+      "id": "data_web",
+      "label": "Perfil ambíguo: dados e desenvolvimento web",
+      "default_response": 3,
+      "answers": {"q_math": 5, "q_analysis": 5, "q_work_data_ai": 5, "q_logic": 5, "q_design": 5, "q_empathy": 5, "q_quality": 5, "q_user_contact": 5, "q_build_apis": 5, "q_pipelines": 3, "q_creative_over_analytic": 5, "q_mobile": 1},
+      "expected_tracks": ["frontend", "data_science"],
+      "expected_partial_tie": true,
+      "check_joint_explanation": true
+    },
+    {
+      "id": "data_backend",
+      "label": "Perfil ambíguo: engenharia de dados e back-end",
+      "default_response": 3,
+      "answers": {"q_logic": 5, "q_build_apis": 5, "q_analysis": 5, "q_pipelines": 5, "q_quality": 4},
+      "expected_tracks": ["data_engineering", "backend"],
+      "expected_partial_tie": true
+    },
+    {
+      "id": "devops_cloud",
+      "label": "Perfil ambíguo: DevOps e nuvem",
+      "default_response": 3,
+      "answers": {"q_infra": 5, "q_networks": 5, "q_automation": 5, "q_cloud": 5, "q_oncall": 5},
+      "expected_tracks": ["devops", "cloud"],
+      "expected_partial_tie": true
+    }
   ]
 }

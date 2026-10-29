@@ -7,7 +7,6 @@ from typing import Any, Mapping
 from knowledge_base import load_knowledge_base
 
 
-UNKNOWN_ANSWER = "Não sei"
 _COMPARATORS = {"<": lt, "<=": le, "==": eq, ">=": ge, ">": gt}
 
 
@@ -55,6 +54,8 @@ class InferenceResult:
 def _validate_answers(
     answers: Mapping[str, Any],
     questions: list[dict[str, Any]],
+    likert: dict[str, Any],
+    unknown_label: str,
 ) -> dict[str, int | str]:
     if not isinstance(answers, Mapping):
         raise ValueError("As respostas devem ser fornecidas em um dicionário.")
@@ -65,28 +66,42 @@ def _validate_answers(
     missing = question_ids - set(answers)
     if missing:
         raise ValueError(
-            "Respostas ausentes (use 1 a 5 ou 'Não sei'): "
-            + ", ".join(sorted(missing))
-            + "."
+            f"Respostas ausentes (use {likert['min']} a {likert['max']} ou "
+            f"'{unknown_label}'): {', '.join(sorted(missing))}."
         )
     validated: dict[str, int | str] = {}
     for question_id, answer in answers.items():
-        if answer == UNKNOWN_ANSWER:
+        if answer == unknown_label:
             validated[question_id] = answer
-        elif isinstance(answer, int) and not isinstance(answer, bool) and 1 <= answer <= 5:
+        elif (
+            isinstance(answer, int)
+            and not isinstance(answer, bool)
+            and likert["min"] <= answer <= likert["max"]
+        ):
             validated[question_id] = answer
         else:
             raise ValueError(
-                f"Resposta inválida para '{question_id}': use um inteiro de 1 a 5 ou '{UNKNOWN_ANSWER}'."
+                f"Resposta inválida para '{question_id}': use um inteiro de "
+                f"{likert['min']} a {likert['max']} ou '{unknown_label}'."
             )
     return validated
 
 
-def _condition_matches(condition: dict[str, Any], answers: Mapping[str, int | str]) -> bool:
+def _condition_matches(
+    condition: dict[str, Any],
+    answers: Mapping[str, int | str],
+    unknown_label: str,
+) -> bool:
     answer = answers[condition["question"]]
-    if answer == UNKNOWN_ANSWER:
+    if answer == unknown_label:
         return False
     return _COMPARATORS[condition["op"]](answer, condition["value"])
+
+
+def _is_strong_signal(answer: int | str, likert: dict[str, Any]) -> bool:
+    if not isinstance(answer, int) or isinstance(answer, bool):
+        return False
+    return (answer - likert["min"]) / (likert["max"] - likert["min"]) >= 0.75
 
 
 def _explain_tie(
@@ -95,6 +110,8 @@ def _explain_tie(
     tracks_by_id: Mapping[str, dict[str, Any]],
     questions_by_id: Mapping[str, dict[str, Any]],
     answers: Mapping[str, int | str],
+    likert_max: int,
+    unknown_label: str,
 ) -> str:
     first_track = tracks_by_id[first.track_id]
     second_track = tracks_by_id[second.track_id]
@@ -103,7 +120,7 @@ def _explain_tie(
         for question_id in set(first_track["weights"]) & set(second_track["weights"])
         if first_track["weights"][question_id] > 0
         and second_track["weights"][question_id] > 0
-        and answers[question_id] != UNKNOWN_ANSWER
+        and answers[question_id] != unknown_label
     ]
     shared.sort(
         key=lambda question_id: (
@@ -117,7 +134,7 @@ def _explain_tie(
         item = questions_by_id[shared[0]]
         common_text = (
             f" As aproxima, por exemplo, '{item['text']}' "
-            f"(resposta {answers[shared[0] ]}/5)."
+            f"(resposta {answers[shared[0]]}/{likert_max})."
         )
 
     divergent = sorted(
@@ -132,11 +149,11 @@ def _explain_tie(
     for question_id in divergent:
         first_weight = first_track["weights"].get(question_id, 0)
         second_weight = second_track["weights"].get(question_id, 0)
-        if first_weight == second_weight or answers[question_id] == UNKNOWN_ANSWER:
+        if first_weight == second_weight or answers[question_id] == unknown_label:
             continue
         question = questions_by_id[question_id]
         distinctions.append(
-            f"'{question['text']}' ({answers[question_id]}/5; "
+            f"'{question['text']}' ({answers[question_id]}/{likert_max}; "
             f"pesos {first_weight:g} e {second_weight:g})"
         )
         if len(distinctions) == 2:
@@ -161,7 +178,14 @@ def recommend_tracks(
     data = knowledge_base if knowledge_base is not None else load_knowledge_base()
     if not isinstance(data, dict) or "questions" not in data or "tracks" not in data:
         raise ValueError("Base de conhecimento inválida para o motor de inferência.")
-    validated = _validate_answers(answers, data["questions"])
+    likert = data["metadata"]["likert"]
+    unknown_label = likert["unknown_label"]
+    validated = _validate_answers(
+        answers,
+        data["questions"],
+        likert,
+        unknown_label,
+    )
     tracks = data["tracks"]
     tracks_by_id = {track["id"]: track for track in tracks}
     questions_by_id = {question["id"]: question for question in data["questions"]}
@@ -179,7 +203,7 @@ def recommend_tracks(
         weight
         for track in tracks
         for question_id, weight in track["weights"].items()
-        if weight > 0 and validated[question_id] != UNKNOWN_ANSWER
+        if weight > 0 and validated[question_id] != unknown_label
     )
     coverage = answered_positive_weight / total_positive_weight if total_positive_weight else 0.0
     scored: list[tuple[int, TrackResult, int]] = []
@@ -187,16 +211,18 @@ def recommend_tracks(
         available_denominator = sum(
             weight
             for question_id, weight in track["weights"].items()
-            if weight > 0 and validated[question_id] != UNKNOWN_ANSWER
+            if weight > 0 and validated[question_id] != unknown_label
         )
         raw_score = 0.0
         contributions: list[tuple[float, str]] = []
         conflicts: list[str] = []
         for question_id, weight in track["weights"].items():
             answer = validated[question_id]
-            if answer == UNKNOWN_ANSWER:
+            if answer == unknown_label:
                 continue
-            affinity = (answer - 1) / 4
+            if not isinstance(answer, int):
+                raise ValueError(f"Resposta inválida para '{question_id}'.")
+            affinity = (answer - likert["min"]) / (likert["max"] - likert["min"])
             question = questions_by_id[question_id]
             if weight > 0:
                 contribution = affinity * weight
@@ -205,7 +231,7 @@ def recommend_tracks(
                     contributions.append(
                         (
                             contribution,
-                            f"{question['text']}: sua resposta {answer}/5 contribui positivamente para esta trilha.",
+                            f"{question['text']}: sua resposta {answer}/{likert['max']} contribui positivamente para esta trilha.",
                         )
                     )
             elif affinity > 0:
@@ -215,7 +241,10 @@ def recommend_tracks(
                 )
         fired_penalties = []
         for penalty in track["penalties"]:
-            if all(_condition_matches(condition, validated) for condition in penalty["when"]):
+            if all(
+                _condition_matches(condition, validated, unknown_label)
+                for condition in penalty["when"]
+            ):
                 raw_score -= penalty["points"]
                 fired_penalties.append(penalty["explanation"])
         bonus = (
@@ -233,8 +262,7 @@ def recommend_tracks(
             1
             for question_id, weight in track["weights"].items()
             if weight >= 2
-            and validated[question_id] != UNKNOWN_ANSWER
-            and (validated[question_id] - 1) / 4 >= 0.75
+            and _is_strong_signal(validated[question_id], likert)
         )
         result = TrackResult(
             track_id=track["id"],
@@ -258,7 +286,15 @@ def recommend_tracks(
     confidence_level = "Alta" if confidence >= 0.7 else "Média" if confidence >= 0.4 else "Baixa"
     threshold = data["metadata"]["tie_threshold_pp"]
     tie_explanations = tuple(
-        _explain_tie(first, second, tracks_by_id, questions_by_id, validated)
+        _explain_tie(
+            first,
+            second,
+            tracks_by_id,
+            questions_by_id,
+            validated,
+            likert["max"],
+            unknown_label,
+        )
         for first, second in zip(top_three, top_three[1:])
         if first.adherence_pct - second.adherence_pct < threshold
     )
