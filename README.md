@@ -186,3 +186,5 @@ Saída resumida dos casos ambíguos:
 ---
 
 🎓 **Projeto acadêmico** — Consultor Inteligente de Carreiras em TI.
+#   S i s t e m a - E s p e c i a l i s t a - I n t e l i g e n t e - p a r a - M a p e a m e n t o - C o m p a t i b i l i d a d e - e - T r i l h a - d e - C a r r e i r a - e m - T I  
+ 
