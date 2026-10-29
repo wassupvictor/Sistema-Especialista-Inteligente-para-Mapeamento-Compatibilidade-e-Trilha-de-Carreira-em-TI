@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn
 
 
 DEFAULT_PATH = Path(__file__).with_name("regras_carreiras.json")
@@ -12,7 +12,7 @@ CERTIFICATION_TIERS = {"entry", "associate", "professional"}
 OPERATORS = {"<", "<=", "==", ">=", ">"}
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     raise ValueError(f"Base de conhecimento inválida: {message}")
 
 
@@ -81,8 +81,11 @@ def _validate_data(data: Any) -> dict[str, Any]:
             _fail(f"pergunta '{question['id']}' referencia dimensão inexistente '{dimension}'.")
         if question.get("step") not in (2, 3):
             _fail(f"pergunta '{question['id']}' deve pertencer ao passo 2 ou 3.")
-    if not data["profile_questions"]:
+    if not profile_ids:
         _fail("é necessário definir perguntas de perfil.")
+    for field in data["profile_questions"]:
+        if not isinstance(field.get("text"), str) or field.get("type") not in {"select", "number", "text"}:
+            _fail(f"pergunta de perfil '{field['id']}' precisa de texto e tipo de campo válidos.")
 
     for skill in data["skills"]:
         learn = skill.get("learn")

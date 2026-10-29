@@ -33,8 +33,9 @@
     {"id": "communication", "name": "Comunicação e liderança"}
   ],
   "profile_questions": [
-    {"id": "level", "text": "Qual descreve melhor seu nível atual em TI?", "options": ["Iniciante", "Estudo há menos de 1 ano", "1–2 anos de estudo e projetos", "Estágio ou experiência inicial"]},
-    {"id": "hours_per_week", "text": "Quantas horas por semana você pode dedicar ao plano?", "min": 1, "max": 40}
+    {"id": "level", "role": "experience", "type": "select", "text": "Qual descreve melhor seu nível atual em TI?", "options": ["Iniciante", "Estudo há menos de 1 ano", "1–2 anos de estudo e projetos", "Estágio ou experiência inicial"]},
+    {"id": "hours_per_week", "role": "time_budget", "type": "number", "text": "Quantas horas por semana você pode dedicar ao plano?", "min": 1, "max": 40},
+    {"id": "name", "role": "display_name", "type": "text", "text": "Como podemos chamar você? (opcional)"}
   ],
   "questions": [
     {"id": "q_math", "step": 2, "dimension": "math", "text": "Afinidade com matemática e estatística", "help": "Considere seu interesse em raciocínio quantitativo."},

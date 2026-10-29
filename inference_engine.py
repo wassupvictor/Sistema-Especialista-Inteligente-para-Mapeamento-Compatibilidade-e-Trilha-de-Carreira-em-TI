@@ -208,7 +208,7 @@ def recommend_tracks(
                             f"{question['text']}: sua resposta {answer}/5 contribui positivamente para esta trilha.",
                         )
                     )
-            elif weight < 0 and affinity > 0:
+            elif affinity > 0:
                 raw_score -= affinity * abs(weight)
                 conflicts.append(
                     f"{question['text']}: esta preferência conflita parcialmente com o perfil desta trilha."
